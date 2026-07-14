@@ -15,6 +15,7 @@ def register(provider: type[TranslationProvider]) -> None:
 
 # Import providerów - powoduje ich rejestrację
 import translator.providers.dummy  # noqa: E402,F401
+import translator.providers.gemini  # noqa: E402,F401
 
 
 def get(name: str) -> TranslationProvider:

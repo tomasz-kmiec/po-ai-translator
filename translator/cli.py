@@ -4,6 +4,7 @@ Command Line Interface.
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import click
@@ -47,7 +48,23 @@ def main(
     output: Path | None,
 ) -> None:
 
-    po = POFile(input_file)
+    if output is None:
+        output = config.output_dir / input_file.name
+
+    output.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    resume = output.exists()
+
+    if not resume:
+        shutil.copy2(
+            input_file,
+            output,
+        )
+
+    po = POFile(output)
 
     engine = TranslatorEngine(
         provider=get(provider),
@@ -55,19 +72,22 @@ def main(
     )
 
     console.print(f"[cyan]Provider:[/cyan] {provider}")
-    console.print(f"[cyan]Entries:[/cyan] {po.untranslated}")
+    console.print(f"[cyan]Resume:[/cyan] {'YES' if resume else 'NO'}")
+    console.print(f"[cyan]Entries:[/cyan] {po.total}")
+    console.print(f"[cyan]Already translated:[/cyan] {po.translated}")
+    console.print(f"[cyan]Remaining:[/cyan] {po.untranslated}")
 
     entries = list(po.untranslated_entries())
 
     batch_size = config.batch_size
 
-    translated = 0
+    translated = po.translated
 
     for start in range(0, len(entries), batch_size):
 
         batch = entries[start:start + batch_size]
 
-        texts = [e.msgid for e in batch]
+        texts = [entry.msgid for entry in batch]
 
         translations = engine.translate_batch(texts)
 
@@ -75,21 +95,15 @@ def main(
             entry.msgstr = text
             translated += 1
 
+        po.save(output)
+
         console.print(
-            f"[green]Translated:[/green] {translated}/{po.untranslated}"
+            f"[green]Translated:[/green] {translated}/{po.total}"
         )
 
-    if output is None:
-        output = (
-            config.output_dir
-            / f"{input_file.stem}_translated.po"
+        console.print(
+            f"[blue]Saved:[/blue] {output}"
         )
-
-    po.save(output)
-
-    console.print()
-    console.print(f"[bold green]Saved:[/bold green] {output}")
-
-
+        
 if __name__ == "__main__":
     main()
